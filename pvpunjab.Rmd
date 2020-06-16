@@ -1,0 +1,142 @@
+---
+title: "pvpunjab"
+author: "Asmer Asrar Safi"
+date: "6/17/2020"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(mapsapi)
+library(readxl)
+library(maps)
+library(leaflet)
+key = 'AIzaSyDVLsXUWqQEFziOUeHl-6DiLOZ70k-QMQA'
+library(sf)
+library(raster)
+library(janitor)
+library(R.utils)
+library(stringi)
+library(sf)
+```
+
+```{r, include = FALSE}
+
+doc = mp_geocode(
+  addresses = "Lahore",
+  key = key,
+  quiet = TRUE
+)
+
+
+
+bounds = mp_get_bounds(doc)
+bounds
+
+leaflet() %>% 
+  addProviderTiles("CartoDB.Voyager") %>%  
+  addPolygons(data = bounds)
+
+
+``` 
+
+```{r, include = FALSE}
+# Read in Pakistan administrative boundary data
+
+pak <- st_read('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_adm3.shp')
+
+pak %>%
+  ggplot() +
+  geom_sf()
+
+```
+
+```{r, include = FALSE}
+pvdata <- read_excel("PK_Political_Violence_Codesheet_V10 (03JUN2013).xls") %>% 
+  clean_names()
+
+
+```
+
+```{r, include = FALSE}
+
+simpleCap <- function(x) {
+  s <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(s, 1,1)), substring(s, 2),
+      sep="", collapse=" ")
+}
+
+pvdata$town_city <- ifelse(is.na(pvdata$town_city), pvdata$location, pvdata$town_city)
+
+
+pvdata1 <- pvdata %>%
+  mutate(town_city = capitalize(town_city))%>% 
+  filter(province == 'Punjab') %>%
+  group_by(town_city) %>%
+  count() %>%
+  arrange(desc(n)) 
+
+pvdata1
+
+```
+
+```{r, include = FALSE}
+
+punjab <- pak %>%  
+  filter(NAME_1 == "Punjab") %>% 
+  ggplot() + 
+  geom_sf()
+
+punjab
+```
+
+```{r, include = FALSE}
+
+common <- read_csv('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_adm3.csv') %>% 
+  clean_names() %>% 
+  filter(name_1 == "Punjab") %>% 
+  mutate(name_3 = ifelse(name_3 == "Attok", "Attock", name_3)) %>% 
+  mutate(name_3 = ifelse(name_3 == "Okara 1", "Okara", name_3)) %>% 
+  rename("town_city" = name_3)
+
+
+join <- common %>% 
+  left_join(pvdata1, by = "town_city") 
+
+join$n <- ifelse(is.na(join$n), 0, join$n)
+
+join
+```
+
+```{r, include = FALSE}
+punjab <- pak %>%  
+  filter(NAME_1 == "Punjab") %>% 
+  ggplot(aes(fill = join$n)) + 
+  geom_sf() +
+  theme_minimal() +
+  labs(title = "Incidences of Political Violence by City in Punjab, Pakistan",
+       subtitle = "1988 - 2011", 
+       caption = "Source: BFRS Dataset on Political Violence in Pakistan, Empirical Studies of Conflict ") + 
+   theme(plot.title = element_text(face = "bold",
+                                    size = 15,
+                                    hjust = 0.5), 
+         plot.subtitle = element_text(face = "italic",
+                                       size = 10,
+                                       hjust = 0.5),
+             plot.caption = element_text(face = "italic",
+                                      hjust = 0.5,
+                                      size = 9)) +
+  labs(fill = "Cases of Political Violence") +
+  theme(legend.position = "bottom") 
+
+```
+
+```{r, echo = FALSE}
+punjab
+
+```
+
+
