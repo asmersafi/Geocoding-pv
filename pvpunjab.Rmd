@@ -14,47 +14,33 @@ library(mapsapi)
 library(readxl)
 library(maps)
 library(leaflet)
-key = 'AIzaSyDVLsXUWqQEFziOUeHl-6DiLOZ70k-QMQA'
+library(plotly)
 library(sf)
 library(raster)
 library(janitor)
 library(R.utils)
 library(stringi)
 library(sf)
+library(ggiraph)
 ```
 
+
+
+
 ```{r, include = FALSE}
 
-doc = mp_geocode(
-  addresses = "Lahore",
-  key = key,
-  quiet = TRUE
-)
-
-
-
-bounds = mp_get_bounds(doc)
-bounds
-
-leaflet() %>% 
-  addProviderTiles("CartoDB.Voyager") %>%  
-  addPolygons(data = bounds)
-
-
-``` 
-
-```{r, include = FALSE}
-# Read in Pakistan administrative boundary data
+# Read in Pakistan administrative boundary data. Data available as shapefiles. 
+# Necessary for geo-spatial mapping. 
 
 pak <- st_read('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_adm3.shp')
 
-pak %>%
-  ggplot() +
-  geom_sf()
-
 ```
 
 ```{r, include = FALSE}
+
+# Reading in the political violence dataset. Using janitor, clean_names to clean the
+# data. 
+
 pvdata <- read_excel("PK_Political_Violence_Codesheet_V10 (03JUN2013).xls") %>% 
   clean_names()
 
@@ -63,14 +49,25 @@ pvdata <- read_excel("PK_Political_Violence_Codesheet_V10 (03JUN2013).xls") %>%
 
 ```{r, include = FALSE}
 
+# Creating a function for simple capitalization - not used in this, but
+# useful for later. 
+
 simpleCap <- function(x) {
   s <- strsplit(x, " ")[[1]]
   paste(toupper(substring(s, 1,1)), substring(s, 2),
       sep="", collapse=" ")
 }
 
+# Substituting NA values in the town_city variable with data from the 
+# locations variable. A lot of cities/towns have been characterized as 
+# locations, dataset has to be corrected. 
+
 pvdata$town_city <- ifelse(is.na(pvdata$town_city), pvdata$location, pvdata$town_city)
 
+
+# Capitalizing the town_city data, filtering for the Punjab province and 
+# grouping by each town_city to calculate the number of cases of violence
+# in each city over the time period. 
 
 pvdata1 <- pvdata %>%
   mutate(town_city = capitalize(town_city))%>% 
@@ -83,17 +80,11 @@ pvdata1
 
 ```
 
-```{r, include = FALSE}
-
-punjab <- pak %>%  
-  filter(NAME_1 == "Punjab") %>% 
-  ggplot() + 
-  geom_sf()
-
-punjab
-```
 
 ```{r, include = FALSE}
+
+# Reading in the geo-spatial data csv to filter out only the towns and cities
+# that have been mapped as part of the dataset. Wrangling and cleaning the data. 
 
 common <- read_csv('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_adm3.csv') %>% 
   clean_names() %>% 
@@ -102,9 +93,13 @@ common <- read_csv('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_ad
   mutate(name_3 = ifelse(name_3 == "Okara 1", "Okara", name_3)) %>% 
   rename("town_city" = name_3)
 
+# Joining the two datasets (political violence and the .csv for geo-spatially coded)
+# data. 
 
 join <- common %>% 
   left_join(pvdata1, by = "town_city") 
+
+# Replacing NA values with 0 in the joined data. 
 
 join$n <- ifelse(is.na(join$n), 0, join$n)
 
@@ -112,10 +107,13 @@ join
 ```
 
 ```{r, include = FALSE}
+
+# Mapping Punjab.  
+
 punjab <- pak %>%  
   filter(NAME_1 == "Punjab") %>% 
-  ggplot(aes(fill = join$n)) + 
-  geom_sf() +
+  ggplot(aes(fill = join$n, color = join$n)) + 
+  geom_sf(aes(fill = join$n, color = join$n)) +
   theme_minimal() +
   labs(title = "Incidences of Political Violence by City in Punjab, Pakistan",
        subtitle = "1988 - 2011", 
@@ -130,12 +128,38 @@ punjab <- pak %>%
                                       hjust = 0.5,
                                       size = 9)) +
   labs(fill = "Cases of Political Violence") +
-  theme(legend.position = "bottom") 
+  theme(legend.position = "bottom") + 
+  scale_color_gradient(guide = FALSE)
 
 ```
 
 ```{r, echo = FALSE}
-punjab
+
+# Mapping Punjab interactively. 
+
+pal <- colorBin(palette = "viridis", domain = join$n)
+
+punjab2 <- pak %>% 
+  filter(NAME_1 == "Punjab") %>% 
+  leaflet(options = leafletOptions(dragging = TRUE,
+                                   minZoom = 6,
+                                   maxZoom = 10)) %>% 
+  addPolygons(
+        weight = 2,
+        opacity = 1,
+        color = "black",
+        fillColor = ~pal(as.numeric(join$n)),
+        fillOpacity = 1,
+        label = ~paste0(join$town_city, ", ", 
+                        "Number of Cases: ", 
+                        join$n),
+        highlight = highlightOptions(weight = 2, color = "white", 
+                                     bringToFront = TRUE))
+
+
+punjab 
+
+punjab2 
 
 ```
 
