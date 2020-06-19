@@ -87,22 +87,26 @@ pvdata1
 # that have been mapped as part of the dataset. Wrangling and cleaning the data. 
 
 common <- read_csv('/Users/asmersafi/Documents/Gov 1005/Geocoding/PAK_adm/PAK_adm3.csv') %>% 
-  clean_names() %>% 
+  clean_names() 
+
+common1 <- common %>% 
   filter(name_1 == "Punjab") %>% 
   mutate(name_3 = ifelse(name_3 == "Attok", "Attock", name_3)) %>% 
   mutate(name_3 = ifelse(name_3 == "Okara 1", "Okara", name_3)) %>% 
+  mutate(name_3 = ifelse(name_3 == "Gujranwala 1", "Gujranwala", name_3)) %>% 
+   mutate(name_3 = ifelse(name_3 == "Gujranwala 2", "Gujranwala", name_3)) %>% 
   rename("town_city" = name_3)
 
 # Joining the two datasets (political violence and the .csv for geo-spatially coded)
 # data. 
 
-join <- common %>% 
+join <- common1 %>% 
   left_join(pvdata1, by = "town_city") 
 
 # Replacing NA values with 0 in the joined data. 
 
 join$n <- ifelse(is.na(join$n), 0, join$n)
-
+common
 join
 ```
 
@@ -163,4 +167,67 @@ punjab2
 
 ```
 
+```{r}
+
+# PV PAK DATA - not filtering for Punjab
+
+pvdata2 <- pvdata %>%
+  mutate(town_city = capitalize(town_city))%>% 
+  group_by(town_city) %>%
+  count() %>%
+  arrange(desc(n)) 
+
+pvdata2
+
+common <- common %>% 
+    mutate(town_city = ifelse(town_city == "Karachi Central", "Karachi", town_city)) %>%
+    mutate(town_city = ifelse(town_city == "Karachi East", "Karachi", town_city)) %>%
+    mutate(town_city = ifelse(town_city == "Karachi west", "Karachi", town_city)) %>%
+    mutate(town_city = ifelse(town_city == "Karachi South", "Karachi", town_city)) %>% 
+  mutate(town_city = ifelse(town_city == "Malir", "Karachi", town_city))
+  
+
+# joining data again
+
+join2 <- common %>% 
+  left_join(pvdata2, by = "town_city") 
+
+
+# removing NA cases, replaced by 0.
+
+join2$n <- ifelse(is.na(join2$n), 0, join2$n)
+
+
+pakmap <- pak %>%
+  ggplot(aes(fill = join2$n, color = join2$n)) +
+  geom_sf(aes(fill = join2$n, color = join2$n)) +
+  theme_minimal() +
+  labs(title = "Incidences of Political Violence by City in Pakistan",
+       subtitle = "1988 - 2011",
+       caption = "Source: BFRS Dataset on Political Violence in Pakistan, Empirical Studies of Conflict ") +
+   theme(plot.title = element_text(face = "bold",
+                                    size = 15,
+                                    hjust = 0.5),
+         plot.subtitle = element_text(face = "italic",
+                                       size = 10,
+                                       hjust = 0.5),
+             plot.caption = element_text(face = "italic",
+                                      hjust = 0.5,
+                                      size = 9)) +
+  labs(fill = "Cases of Political Violence") +
+  theme(legend.position = "bottom") +
+  scale_color_gradient(guide = FALSE) 
+
+common
+
+```
+
+```{r}
+
+pakmap
+
+
+
+
+```
 
