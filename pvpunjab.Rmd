@@ -1,5 +1,5 @@
 ---
-title: "pvpunjab"
+title: "Pakistan- Political Violence"
 author: "Asmer Asrar Safi"
 date: "6/17/2020"
 output: html_document
@@ -137,7 +137,7 @@ punjab <- pak %>%
 
 ```
 
-```{r, echo = FALSE}
+```{r, include = FALSE}
 
 # Mapping Punjab interactively. 
 
@@ -167,7 +167,7 @@ punjab2
 
 ```
 
-```{r}
+```{r, include = FALSE}
 
 # PV PAK DATA - not filtering for Punjab
 
@@ -177,16 +177,16 @@ pvdata2 <- pvdata %>%
   count() %>%
   arrange(desc(n)) 
 
-pvdata2
 
-common <- common %>% 
+common <- common %>%
+   rename('town_city' = name_3) %>%
     mutate(town_city = ifelse(town_city == "Karachi Central", "Karachi", town_city)) %>%
     mutate(town_city = ifelse(town_city == "Karachi East", "Karachi", town_city)) %>%
     mutate(town_city = ifelse(town_city == "Karachi west", "Karachi", town_city)) %>%
-    mutate(town_city = ifelse(town_city == "Karachi South", "Karachi", town_city)) %>% 
+    mutate(town_city = ifelse(town_city == "Karachi South", "Karachi", town_city)) %>%
   mutate(town_city = ifelse(town_city == "Malir", "Karachi", town_city))
   
-
+common
 # joining data again
 
 join2 <- common %>% 
@@ -216,18 +216,57 @@ pakmap <- pak %>%
                                       size = 9)) +
   labs(fill = "Cases of Political Violence") +
   theme(legend.position = "bottom") +
-  scale_color_gradient(guide = FALSE) 
-
-common
-
-```
-
-```{r}
-
-pakmap
-
-
+  scale_fill_gradient(low = "lightblue", 
+                        high = "darkblue") +
+  scale_color_gradient(low = "lightblue", 
+                       high = "darkblue",
+                       guide = FALSE)
 
 
 ```
+
+
+```{r, echo=FALSE}
+
+bins <- c(0, 50, 300, 800, 2000, 7000)
+# pal <- colorQuantile(palette = "Reds", domain = join2$n, n = 5)
+
+ pal <- colorBin(palette = "Reds", domain = join2$n,
+                    bins = bins)
+  
+
+
+
+pakmap2 <- pak %>% 
+  leaflet(options = leafletOptions(dragging = TRUE,
+                                   minZoom = 5,
+                                   maxZoom = 10)) %>% 
+  addPolygons(
+        weight = 0.5,
+        opacity = 1,
+        color = "black",
+        fillColor = ~pal(as.numeric(join2$n)),
+        fillOpacity = 1,
+        label = ~paste0(join2$town_city, 
+                        ", ", 
+                        "Number of Cases: ", 
+                        join2$n),
+        highlight = highlightOptions(weight = 2, color = "white", 
+                                     bringToFront = TRUE),
+        labelOptions = labelOptions(
+    style = list("font-weight" = "normal", padding = "3px 8px"),
+    textsize = "10px",
+    direction = "auto")) %>% 
+  
+  addLegend(pal = pal, values = ~join2$n, opacity = 0.7,
+                title = "Cases of Political Violence by District",
+                position = "bottomright")
+
+
+pakmap2
+
+```
+
+
+
 
